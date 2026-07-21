@@ -1,0 +1,36 @@
+name: opencode-api
+services:
+  - name: api
+    source_dir: /
+    github:
+      branch: main
+      deploy_on_push: true
+    build_command: pip install -r requirements.txt
+    run_command: uvicorn app.main:app --host 0.0.0.0 --port 8080
+    environment_slug: python
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /health
+    envs:
+      - key: ZEN_BASE_URL
+        scope: RUN_TIME
+        value: https://llm.chompe.rs
+      - key: ZEN_AUTH_VERIFY_URL
+        scope: RUN_TIME
+        value: https://llm.chompe.rs/v1/auth/verify
+      - key: ZEN_API_HEADER
+        scope: RUN_TIME
+        value: X-Zen-Api-Key
+      - key: AUTH_CACHE_TTL_SECONDS
+        scope: RUN_TIME
+        value: "300"
+      - key: AUTH_CACHE_MAX_SIZE
+        scope: RUN_TIME
+        value: "10000"
+      - key: UPSTREAM_TIMEOUT_SECONDS
+        scope: RUN_TIME
+        value: "60"
+      - key: LOG_LEVEL
+        scope: RUN_TIME
+        value: info
