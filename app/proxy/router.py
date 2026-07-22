@@ -2,6 +2,7 @@ import json
 import logging
 from typing import Any
 
+import httpx
 from curl_cffi.requests import errors as curl_errors
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -107,26 +108,54 @@ async def proxy_v1(
         bool(key),
     )
 
-    curl_client = request.app.state.curl_client
+    # Use plain httpx for the Cloudflare Worker relay. curl_cffi's HTTP/2
+    # fingerprinting can cause Cloudflare's edge to return 421 Misdirected
+    # Request for Worker subdomains, and the Worker is already on Cloudflare so
+    # it does not need browser impersonation. Keep curl_cffi only for direct
+    # Zen requests (if the Worker relay is disabled).
+    worker_url = settings.zen_worker_url.strip().rstrip("/")
+    use_worker = bool(worker_url) and upstream_url.startswith(worker_url)
 
-    try:
-        upstream_response = await curl_client.request(
-            method=method,
-            url=upstream_url,
-            params=query_params,
-            headers=forward_headers,
-            data=body,
-            stream=True,
-        )
-    except curl_errors.RequestsError as exc:
-        if exc.code == 28:  # CURLE_OPERATION_TIMEDOUT
+    if use_worker:
+        http_client = request.app.state.http_client
+        try:
+            upstream_response = await http_client.request(
+                method=method,
+                url=upstream_url,
+                params=query_params,
+                headers=forward_headers,
+                content=body,
+                follow_redirects=True,
+            )
+        except httpx.TimeoutException as exc:
             logger.warning("Upstream timeout: %s %s", method, upstream_url)
             raise HTTPException(status_code=504, detail="Gateway timeout") from exc
-        logger.warning("Upstream request error: %s", exc)
-        raise HTTPException(status_code=502, detail="Bad gateway") from exc
-    except Exception as exc:
-        logger.warning("Upstream request error: %s", exc)
-        raise HTTPException(status_code=502, detail="Bad gateway") from exc
+        except httpx.RequestError as exc:
+            logger.warning("Upstream request error: %s", exc)
+            raise HTTPException(status_code=502, detail="Bad gateway") from exc
+        except Exception as exc:
+            logger.warning("Upstream request error: %s", exc)
+            raise HTTPException(status_code=502, detail="Bad gateway") from exc
+    else:
+        curl_client = request.app.state.curl_client
+        try:
+            upstream_response = await curl_client.request(
+                method=method,
+                url=upstream_url,
+                params=query_params,
+                headers=forward_headers,
+                data=body,
+                stream=True,
+            )
+        except curl_errors.RequestsError as exc:
+            if exc.code == 28:  # CURLE_OPERATION_TIMEDOUT
+                logger.warning("Upstream timeout: %s %s", method, upstream_url)
+                raise HTTPException(status_code=504, detail="Gateway timeout") from exc
+            logger.warning("Upstream request error: %s", exc)
+            raise HTTPException(status_code=502, detail="Bad gateway") from exc
+        except Exception as exc:
+            logger.warning("Upstream request error: %s", exc)
+            raise HTTPException(status_code=502, detail="Bad gateway") from exc
 
     response_headers: dict[str, str] = {}
     for name, value in upstream_response.headers.items():
@@ -138,15 +167,21 @@ async def proxy_v1(
 
     async def response_stream():
         try:
-            async for chunk in upstream_response.aiter_content():
-                yield chunk
+            # httpx uses aiter_bytes(); curl_cffi uses aiter_content().
+            if hasattr(upstream_response, "aiter_content"):
+                async for chunk in upstream_response.aiter_content():
+                    yield chunk
+            else:
+                async for chunk in upstream_response.aiter_bytes():
+                    yield chunk
         finally:
             await upstream_response.aclose()
 
     logger.info(
-        "Proxy response: method=%s path=%s upstream_status=%s",
+        "Proxy response: method=%s path=%s upstream=%s upstream_status=%s",
         request.method,
         path,
+        upstream_url,
         upstream_response.status_code,
     )
     return StreamingResponse(
