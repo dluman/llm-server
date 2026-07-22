@@ -18,10 +18,10 @@ services:
     envs:
       - key: ZEN_BASE_URL
         scope: RUN_TIME
-        value: https://llm.chompe.rs
+        value: https://opencode.ai/zen
       - key: ZEN_AUTH_VERIFY_URL
         scope: RUN_TIME
-        value: https://llm.chompe.rs/v1/auth/verify
+        value: https://opencode.ai/zen/v1/models
       - key: ZEN_API_HEADER
         scope: RUN_TIME
         value: X-Zen-Api-Key

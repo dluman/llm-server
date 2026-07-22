@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     app_name: str = "opencode-api"
     log_level: str = "info"
 
-    zen_base_url: str = "https://llm.chompe.rs"
-    zen_auth_verify_url: str = "https://llm.chompe.rs/v1/auth/verify"
+    zen_base_url: str = "https://opencode.ai/zen"
+    zen_auth_verify_url: str = "https://opencode.ai/zen/v1/models"
     zen_api_header: str = "X-Zen-Api-Key"
 
     auth_cache_ttl_seconds: int = 300

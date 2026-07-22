@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any
 
@@ -7,6 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
 from app.dependencies import require_github_session, require_valid_key
+from app.proxy.routing import resolve_zen_endpoint
 
 logger = logging.getLogger(__name__)
 
@@ -43,15 +45,6 @@ async def proxy_v1(
     base_url = settings.canonical_zen_base_url.rstrip("/")
     upstream_url = f"{base_url}/v1/{path}"
 
-    logger.info(
-        "Proxy request: method=%s path=%s upstream=%s user=%s key_present=%s",
-        request.method,
-        path,
-        upstream_url,
-        getattr(request.state, "github_login", None),
-        bool(key),
-    )
-
     query_params: dict[str, Any] = dict(request.query_params)
 
     forward_headers: dict[str, str] = {}
@@ -62,13 +55,45 @@ async def proxy_v1(
 
     # Always attach the validated key to the upstream request.
     forward_headers[settings.zen_api_header] = key
+    forward_headers.setdefault("user-agent", "opencode-api-proxy/1.0")
 
-    client: httpx.AsyncClient = request.app.state.http_client
     method = request.method
-
     body: bytes = b""
     if method not in _NO_BODY_METHODS:
         body = await request.body()
+
+    # Route chat completion requests to the correct Zen endpoint based on the
+    # requested model.
+    if method == "POST" and path.strip("/") == "chat/completions":
+        try:
+            payload = json.loads(body)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            logger.warning(
+                "Model-aware routing skipped: could not parse chat completion body"
+            )
+            payload = None
+
+        if isinstance(payload, dict):
+            model_id = payload.get("model")
+            endpoint = resolve_zen_endpoint(model_id)
+            upstream_url = f"{base_url}/v1/{endpoint}"
+            logger.info(
+                "Model-aware routing: model=%s resolved_endpoint=%s upstream=%s",
+                model_id,
+                endpoint,
+                upstream_url,
+            )
+
+    logger.info(
+        "Proxy request: method=%s path=%s upstream=%s user=%s key_present=%s",
+        request.method,
+        path,
+        upstream_url,
+        getattr(request.state, "github_login", None),
+        bool(key),
+    )
+
+    client: httpx.AsyncClient = request.app.state.http_client
 
     try:
         upstream_request = client.build_request(

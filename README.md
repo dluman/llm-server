@@ -1,6 +1,6 @@
 # OpenCode API Proxy
 
-A FastAPI service that authenticates users via a GitHub Enterprise membership and an `X-Zen-Api-Key` header, validates the key against the Opencode Zen API (`llm.chompe.rs`), and proxies all `/v1/*` requests to the upstream.
+A FastAPI service that authenticates users via a GitHub Enterprise membership and an `X-Zen-Api-Key` header, validates the key against the Opencode Zen API (`https://opencode.ai/zen`), and proxies all `/v1/*` requests to the upstream.
 
 ## Features
 
@@ -8,9 +8,10 @@ A FastAPI service that authenticates users via a GitHub Enterprise membership an
 - GitHub OAuth device flow for non-interactive clients
 - Optional direct GitHub token exchange for service accounts
 - Custom header API-key auth: `X-Zen-Api-Key`
-- Validation forwarded to Opencode Zen at `https://llm.chompe.rs/v1/auth/verify`
+- Validation forwarded to Opencode Zen at `https://opencode.ai/zen/v1/models`
 - In-memory TTL cache for successful validations (saves bandwidth)
 - Transparent streaming proxy for all `/v1/{path:path}` endpoints
+- Model-aware routing: `/v1/chat/completions` is rewritten to the correct Zen endpoint for GPT, Claude/Qwen, Gemini, and other model families
 - `/health` endpoint for DigitalOcean App Platform health checks
 
 ## Local development
@@ -28,8 +29,8 @@ Copy `.env.example` to `.env` and adjust:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ZEN_BASE_URL` | `https://llm.chompe.rs` | Upstream base URL |
-| `ZEN_AUTH_VERIFY_URL` | `https://llm.chompe.rs/v1/auth/verify` | Key validation endpoint |
+| `ZEN_BASE_URL` | `https://opencode.ai/zen` | Upstream base URL |
+| `ZEN_AUTH_VERIFY_URL` | `https://opencode.ai/zen/v1/models` | Key validation endpoint |
 | `ZEN_API_HEADER` | `X-Zen-Api-Key` | Header clients must send |
 | `AUTH_CACHE_TTL_SECONDS` | `300` | How long to cache successful validations |
 | `AUTH_CACHE_MAX_SIZE` | `10000` | Max cached keys |
@@ -86,6 +87,19 @@ curl -H "Authorization: Bearer $SESSION_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"model": "...", "messages": [{"role": "user", "content": "hi"}]}'
 ```
+
+## Model-aware routing
+
+For `POST /v1/chat/completions`, the proxy inspects the `model` field and routes to the correct OpenCode Zen endpoint:
+
+| Model prefix | Upstream endpoint |
+|--------------|-------------------|
+| `gpt-*`, `o1-*`, `o3-*`, `chatgpt-*` | `/zen/v1/responses` |
+| `claude-*`, `qwen*` | `/zen/v1/messages` |
+| `gemini-*` | `/zen/v1/models/{model}` |
+| everything else (deepseek, grok, minimax, glm, kimi, etc.) | `/zen/v1/chat/completions` |
+
+All other `/v1/*` paths are proxied directly without rewriting.
 
 ## Deploy to DigitalOcean App Platform
 
