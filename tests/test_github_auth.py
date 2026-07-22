@@ -186,3 +186,14 @@ def test_proxy_rejects_missing_session(client, auth_settings, monkeypatch):
 
     assert response.status_code == 401
     assert "session token" in response.json()["detail"].lower()
+
+
+def test_redact_json_masks_sensitive_keys():
+    from app.auth.github import _redact_json
+
+    raw = '{"device_code":"secret123","access_token":"super_secret","user_code":"ABC-123"}'
+    redacted = _redact_json(raw)
+    assert '"<redacted>"' in redacted
+    assert "secret123" not in redacted
+    assert "super_secret" not in redacted
+    assert "ABC-123" in redacted

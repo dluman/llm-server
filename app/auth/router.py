@@ -92,6 +92,11 @@ async def _create_session_for_token(
         enterprise_slug=settings.github_enterprise_slug,
     )
 
+    logger.info(
+        "GitHub auth succeeded for user=%s enterprise=%s",
+        login,
+        settings.github_enterprise_slug,
+    )
     return SessionResponse(
         github_login=login,
         enterprise_slug=settings.github_enterprise_slug,
@@ -113,6 +118,11 @@ async def device_code(request: Request):
         logger.warning("Device code request failed: %s", exc)
         raise HTTPException(status_code=502, detail="Failed to start GitHub device flow")
 
+    logger.info(
+        "Device code issued for client_id=%s user_code=%s",
+        settings.github_client_id,
+        payload["user_code"],
+    )
     return DeviceCodeResponse(
         device_code=payload["device_code"],
         user_code=payload["user_code"],

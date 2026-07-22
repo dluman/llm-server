@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any, Optional
 
@@ -6,6 +7,23 @@ import httpx
 from app.config import Settings
 
 logger = logging.getLogger(__name__)
+
+_SENSITIVE_OAUTH_KEYS = {"device_code", "access_token", "refresh_token"}
+
+
+def _redact_json(text: str, keys: set[str] | None = None) -> str:
+    """Return a JSON string with sensitive OAuth values redacted."""
+    keys = keys or _SENSITIVE_OAUTH_KEYS
+    try:
+        data = json.loads(text)
+    except Exception:
+        return text
+    if not isinstance(data, dict):
+        return text
+    for key in keys:
+        if key in data:
+            data[key] = "<redacted>"
+    return json.dumps(data)
 
 
 class GitHubAuthError(Exception):
@@ -48,6 +66,12 @@ async def request_device_code(settings: Settings) -> dict[str, Any]:
     if scopes:
         data["scope"] = scopes
 
+    logger.info(
+        "GitHub device code request: client_id=%s scope=%s",
+        settings.github_client_id,
+        scopes or "<none>",
+    )
+
     async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.post(
             settings.github_device_code_url,
@@ -60,9 +84,15 @@ async def request_device_code(settings: Settings) -> dict[str, Any]:
         logger.warning(
             "GitHub device code request HTTP %s: %s",
             response.status_code,
-            response.text,
+            _redact_json(response.text),
         )
         raise GitHubAuthError(f"GitHub device code request failed: {exc}") from exc
+
+    logger.info(
+        "GitHub device code response HTTP %s: %s",
+        response.status_code,
+        _redact_json(response.text),
+    )
 
     payload = response.json()
     if "error" in payload:
@@ -91,11 +121,14 @@ async def poll_device_token(settings: Settings, device_code: str) -> dict[str, A
 
     # GitHub returns 200 even for pending/errors in the OAuth flow.
     payload = response.json()
+
+    logger.info(
+        "GitHub device token poll response HTTP %s: %s",
+        response.status_code,
+        _redact_json(response.text),
+    )
+
     if "error" in payload:
-        logger.warning(
-            "GitHub device token poll error response: %s",
-            response.text,
-        )
         error = payload["error"]
         if error == "authorization_pending":
             raise GitHubPendingError("Authorization pending")
@@ -111,7 +144,7 @@ async def poll_device_token(settings: Settings, device_code: str) -> dict[str, A
         raise GitHubAuthError("GitHub token response missing access_token")
 
     logger.info(
-        "GitHub device token response scopes: %s",
+        "GitHub device token granted scopes: %s",
         payload.get("scope", "<none>"),
     )
     return payload
