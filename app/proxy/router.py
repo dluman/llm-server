@@ -111,13 +111,19 @@ async def proxy_v1(
 
     http_client = request.app.state.http_client
     try:
+        #upstream_response = await http_client.request(
+        #    method=method,
+        #    url=upstream_url,
+        #    params=query_params,
+        #    headers=forward_headers,
+        #    content=body,
+        #    follow_redirects=True,
+        #)
         upstream_response = await http_client.request(
             method=method,
             url=upstream_url,
-            params=query_params,
-            headers=forward_headers,
-            content=body,
-            follow_redirects=True,
+            params={"model": "deepseek-v4-flash","messages": [{"role": "user", "content": "Hello"}]},
+            headers={"Authorization": f"Bearer {key}"}
         )
     except httpx.TimeoutException as exc:
         logger.warning("Upstream timeout: %s %s", method, upstream_url)
@@ -152,13 +158,11 @@ async def proxy_v1(
             await upstream_response.aclose()
 
     logger.info(
-        "Proxy response: method=%s path=%s upstream=%s upstream_status=%s http_version=%s headers=%s params=%s",
+        "Proxy response: method=%s path=%s upstream=%s upstream_status=%s http_version=%s",
         request.method,
         path,
         upstream_url,
         upstream_response.status_code,
-        forward_headers,
-        query_params,
         getattr(upstream_response, "http_version", "unknown"),
     )
     return StreamingResponse(
