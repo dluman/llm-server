@@ -157,6 +157,8 @@ async def proxy_v1(
         path,
         upstream_url,
         upstream_response.status_code,
+        forward_headers,
+        query_params,
         getattr(upstream_response, "http_version", "unknown"),
     )
     return StreamingResponse(
