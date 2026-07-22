@@ -61,6 +61,11 @@ async def proxy_v1(
     }
     forward_headers["Authorization"] = f"Bearer {key}"
 
+    # httpx auto-injects 'python-httpx/0.27.0' as User-Agent, which Zen's bot
+    # filter blocks. Use a benign default when the client did not send one.
+    if not any(k.lower() == "user-agent" for k in forward_headers):
+        forward_headers["User-Agent"] = "curl/7.88.1"
+
     base_url = settings.canonical_zen_base_url.rstrip("/")
     upstream_url = f"{base_url}/v1/{path}"
 
