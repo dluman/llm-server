@@ -55,10 +55,18 @@ async def proxy_v1(
     # The client sends Authorization: Bearer <github_session> for GitHub auth
     # and X-Zen-Api-Key: <key> for Zen.  We strip both before forwarding, then
     # attach the validated Zen key as Authorization: Bearer for the upstream.
+    # We also strip User-Agent so the upstream HTTP client (requests) can send
+    # its own default, which matches its TLS fingerprint and avoids Cloudflare
+    # BIC blocks caused by a mismatched User-Agent + TLS fingerprint.
     forward_headers = {
         k: v
         for k, v in forward_headers.items()
-        if k.lower() not in {"authorization", settings.zen_api_header.lower()}
+        if k.lower()
+        not in {
+            "authorization",
+            settings.zen_api_header.lower(),
+            "user-agent",
+        }
     }
     forward_headers["Authorization"] = f"Bearer {key}"
 
