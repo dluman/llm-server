@@ -35,11 +35,16 @@ query($first: Int!, $after: String) {
 
 async def request_device_code(settings: Settings) -> dict[str, Any]:
     """Request a device code from GitHub to start the device flow."""
+    data = {"client_id": settings.github_client_id}
+    scopes = settings.github_device_flow_scopes.strip()
+    if scopes:
+        data["scope"] = scopes
+
     async with httpx.AsyncClient(timeout=10.0) as client:
         response = await client.post(
             settings.github_device_code_url,
             headers={"Accept": "application/json"},
-            data={"client_id": settings.github_client_id},
+            data=data,
         )
     try:
         response.raise_for_status()

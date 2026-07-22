@@ -5,7 +5,7 @@ A FastAPI service that authenticates users via a GitHub Enterprise membership an
 ## Features
 
 - GitHub Enterprise membership gate: only members of any org in a configured enterprise can access the proxy
-- GitHub App OAuth device flow for non-interactive clients
+- GitHub OAuth device flow for non-interactive clients
 - Optional direct GitHub token exchange for service accounts
 - Custom header API-key auth: `X-Zen-Api-Key`
 - Validation forwarded to Opencode Zen at `https://llm.chompe.rs/v1/auth/verify`
@@ -43,7 +43,10 @@ Copy `.env.example` to `.env` and adjust:
 | `GITHUB_SESSION_TTL_SECONDS` | `28800` | Session token lifetime |
 | `GITHUB_DEVICE_FLOW_ENABLED` | `true` | Enable `/auth/device/*` endpoints |
 | `GITHUB_DIRECT_TOKEN_ENABLED` | `true` | Enable `/auth/token` exchange |
+| `GITHUB_DEVICE_FLOW_SCOPES` | `""` | OAuth scopes to request (e.g. `read:org read:enterprise`) |
 | `SESSION_SECRET_KEY` | `""` | Secret for signing session JWTs (min 32 bytes) |
+
+> **Note:** The enterprise-membership GraphQL query requires the `read:enterprise` OAuth scope. GitHub Apps cannot grant this scope, so the device flow must be backed by a **GitHub OAuth App** (not a GitHub App) with `GITHUB_DEVICE_FLOW_SCOPES=read:org read:enterprise`. Direct token exchange works with any token that has those scopes.
 
 ## Authentication
 

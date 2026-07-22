@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     github_session_ttl_seconds: int = 28800
     github_device_flow_enabled: bool = True
     github_direct_token_enabled: bool = True
+    github_device_flow_scopes: str = ""
     session_secret_key: str = ""
 
     github_graphql_url: str = "https://api.github.com/graphql"
