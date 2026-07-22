@@ -61,8 +61,15 @@ async def proxy_v1(
             continue
         forward_headers[name] = value
 
-    # Always attach the validated key to the upstream request.
-    forward_headers[settings.zen_api_header] = key
+    # Remove any client auth headers that should not be forwarded to Zen, then
+    # attach the validated key as a Bearer token (OpenCode/Zen expects this
+    # format for inference endpoints).
+    forward_headers = {
+        k: v
+        for k, v in forward_headers.items()
+        if k.lower() not in {"authorization", settings.zen_api_header.lower()}
+    }
+    forward_headers["Authorization"] = f"Bearer {key}"
 
     base_url = settings.canonical_zen_base_url.rstrip("/")
     worker_url = settings.zen_worker_url.strip().rstrip("/")

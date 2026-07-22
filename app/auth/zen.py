@@ -57,7 +57,7 @@ async def validate_key(client: httpx.AsyncClient, key: str) -> ValidationResult:
         response = await client.get(
             settings.zen_auth_verify_url,
             headers={
-                settings.zen_api_header: key,
+                "Authorization": f"Bearer {key}",
                 "user-agent": "opencode-api-proxy/1.0",
             },
             timeout=10.0,
