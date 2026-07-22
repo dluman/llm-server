@@ -88,12 +88,32 @@ curl -X POST https://your-app.ondigitalocean.app/auth/token \
 
 ## Example request
 
+### cURL
+
 ```bash
 curl -H "Authorization: Bearer $SESSION_TOKEN" \
      -H "X-Zen-Api-Key: $YOUR_ZEN_KEY" \
      https://your-app.ondigitalocean.app/v1/chat/completions \
      -H "Content-Type: application/json" \
      -d '{"model": "...", "messages": [{"role": "user", "content": "hi"}]}'
+```
+
+### Python (OpenAI library)
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://your-app.ondigitalocean.app/v1",
+    api_key="<your_github_session_token>",
+    default_headers={"X-Zen-Api-Key": "<your_zen_key>"}
+)
+
+response = client.chat.completions.create(
+    model="deepseek-v4-flash",
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+print(response.choices[0].message.content)
 ```
 
 ## Model-aware routing

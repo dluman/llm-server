@@ -64,7 +64,7 @@ async def proxy_v1(
 
     base_url = settings.canonical_zen_base_url.rstrip("/")
     upstream_url = f"{base_url}/v1/{path}"
-
+    
     method = request.method
     body: bytes = b""
     if method not in _NO_BODY_METHODS:
