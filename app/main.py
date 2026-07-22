@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI):
     app.state.http_client = httpx.AsyncClient(
         timeout=settings.upstream_timeout_seconds,
         follow_redirects=True,
+        http2=False,
     )
     yield
     logger.info("Shutting down")
