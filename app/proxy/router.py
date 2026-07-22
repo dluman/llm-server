@@ -152,7 +152,7 @@ async def proxy_v1(
             await upstream_response.aclose()
 
     logger.info(
-        "Proxy response: method=%s path=%s upstream=%s upstream_status=%s http_version=%s",
+        "Proxy response: method=%s path=%s upstream=%s upstream_status=%s http_version=%s headers=%s params=%s",
         request.method,
         path,
         upstream_url,
