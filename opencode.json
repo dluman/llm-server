@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "cloudflare-api": {
+      "type": "remote",
+      "url": "https://mcp.cloudflare.com/mcp",
+      "enabled": true
+    },
+    "digitalocean-app-platform": {
+      "type": "local",
+      "command": ["npx", "-y", "@digitalocean/mcp", "--services", "apps"],
+      "enabled": true,
+      "environment": {
+        "DIGITALOCEAN_API_TOKEN": "{env:DIGITALOCEAN_API_KEY}"
+      },
+      "timeout": 30000
+    }
+  }
+}
