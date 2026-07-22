@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     zen_auth_verify_url: str = "https://opencode.ai/zen/v1/models"
     zen_api_header: str = "X-Zen-Api-Key"
 
+    # Optional Cloudflare Worker relay. If set, /v1/* requests are routed through
+    # the worker with X-Relay-Token authentication. Useful when the upstream
+    # blocks the app's hosting IPs.
+    zen_worker_url: str = ""
+    zen_worker_token: str = ""
+
     auth_cache_ttl_seconds: int = 300
     auth_cache_max_size: int = 10000
 

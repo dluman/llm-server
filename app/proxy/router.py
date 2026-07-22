@@ -51,9 +51,6 @@ async def proxy_v1(
 ):
     """Transparently proxy authenticated requests to the Opencode Zen upstream."""
     settings = get_settings()
-    base_url = settings.canonical_zen_base_url.rstrip("/")
-    upstream_url = f"{base_url}/v1/{path}"
-
     query_params: dict[str, Any] = dict(request.query_params)
 
     forward_headers: dict[str, str] = {}
@@ -65,6 +62,14 @@ async def proxy_v1(
 
     # Always attach the validated key to the upstream request.
     forward_headers[settings.zen_api_header] = key
+
+    base_url = settings.canonical_zen_base_url.rstrip("/")
+    worker_url = settings.zen_worker_url.strip().rstrip("/")
+    if worker_url:
+        base_url = worker_url
+        forward_headers["X-Relay-Token"] = settings.zen_worker_token
+
+    upstream_url = f"{base_url}/v1/{path}"
 
     method = request.method
     body: bytes = b""

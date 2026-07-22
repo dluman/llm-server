@@ -33,6 +33,8 @@ Copy `.env.example` to `.env` and adjust:
 | `ZEN_BASE_URL` | `https://opencode.ai/zen` | Upstream base URL |
 | `ZEN_AUTH_VERIFY_URL` | `https://opencode.ai/zen/v1/models` | Key validation endpoint |
 | `ZEN_API_HEADER` | `X-Zen-Api-Key` | Header clients must send |
+| `ZEN_WORKER_URL` | `https://llm-chompers.dluman.workers.dev` | Optional Cloudflare Worker relay for `/v1/*` |
+| `ZEN_WORKER_TOKEN` | `""` | Shared secret for Worker relay authentication |
 | `AUTH_CACHE_TTL_SECONDS` | `300` | How long to cache successful validations |
 | `AUTH_CACHE_MAX_SIZE` | `10000` | Max cached keys |
 | `UPSTREAM_TIMEOUT_SECONDS` | `60` | Timeout for upstream requests |
@@ -101,6 +103,28 @@ For `POST /v1/chat/completions`, the proxy inspects the `model` field and routes
 | everything else (deepseek, grok, minimax, glm, kimi, etc.) | `/zen/v1/chat/completions` |
 
 All other `/v1/*` paths are proxied directly without rewriting.
+
+## Cloudflare Worker relay (optional)
+
+If `opencode.ai/zen` blocks your hosting provider's IPs, you can route `/v1/*` requests through the included Cloudflare Worker in `worker/`.
+
+1. Install Wrangler and authenticate:
+   ```bash
+   npm install -g wrangler
+   wrangler login
+   ```
+2. Deploy the Worker:
+   ```bash
+   cd worker
+   wrangler deploy
+   ```
+3. Set the relay secret:
+   ```bash
+   wrangler secret put RELAY_TOKEN
+   ```
+4. Set `ZEN_WORKER_URL` and `ZEN_WORKER_TOKEN` in the DO App Platform console (or `.env` for local dev).
+
+When `ZEN_WORKER_URL` is set, the proxy sends all `/v1/*` requests to the Worker with an `X-Relay-Token` header; the Worker forwards them to `https://opencode.ai/zen`.
 
 ## Deploy to DigitalOcean App Platform
 
