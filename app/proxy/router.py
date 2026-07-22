@@ -43,6 +43,15 @@ async def proxy_v1(
     base_url = settings.canonical_zen_base_url.rstrip("/")
     upstream_url = f"{base_url}/v1/{path}"
 
+    logger.info(
+        "Proxy request: method=%s path=%s upstream=%s user=%s key_present=%s",
+        request.method,
+        path,
+        upstream_url,
+        getattr(request.state, "github_login", None),
+        bool(key),
+    )
+
     query_params: dict[str, Any] = dict(request.query_params)
 
     forward_headers: dict[str, str] = {}
@@ -90,6 +99,12 @@ async def proxy_v1(
         finally:
             await upstream_response.aclose()
 
+    logger.info(
+        "Proxy response: method=%s path=%s upstream_status=%s",
+        request.method,
+        path,
+        upstream_response.status_code,
+    )
     return StreamingResponse(
         content=response_stream(),
         status_code=upstream_response.status_code,

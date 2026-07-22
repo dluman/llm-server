@@ -48,6 +48,11 @@ async def validate_key(client: httpx.AsyncClient, key: str) -> ValidationResult:
         return ValidationResult(valid=True, cached=True, metadata=cached_metadata)
 
     settings = get_settings()
+    logger.info(
+        "Zen auth verify request: url=%s header_present=%s",
+        settings.zen_auth_verify_url,
+        bool(key),
+    )
     try:
         response = await client.get(
             settings.zen_auth_verify_url,
@@ -63,6 +68,8 @@ async def validate_key(client: httpx.AsyncClient, key: str) -> ValidationResult:
     except Exception as exc:
         logger.exception("Unexpected error during Zen auth verify: %s", exc)
         return ValidationResult(valid=False)
+
+    logger.info("Zen auth verify response: status=%s", response.status_code)
 
     if 200 <= response.status_code < 300:
         try:
