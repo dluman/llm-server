@@ -12,6 +12,7 @@ A FastAPI service that authenticates users via a GitHub Enterprise membership an
 - In-memory TTL cache for successful validations (saves bandwidth)
 - Transparent streaming proxy for all `/v1/{path:path}` endpoints
 - Model-aware routing: `/v1/chat/completions` is rewritten to the correct Zen endpoint for GPT, Claude/Qwen, Gemini, and other model families
+- Browser-impersonating upstream client (`curl_cffi`) to avoid Cloudflare bot checks on inference endpoints
 - `/health` endpoint for DigitalOcean App Platform health checks
 
 ## Local development
