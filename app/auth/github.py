@@ -19,7 +19,7 @@ class GitHubPendingError(Exception):
 _GRAPHQL_ENTERPRISES_QUERY = """
 query($first: Int!, $after: String) {
   viewer {
-    enterprises(first: $first, after: $after, membershipType: ORG_MEMBERSHIP) {
+    enterprises(first: $first, after: $after) {
       nodes {
         slug
       }
@@ -28,6 +28,14 @@ query($first: Int!, $after: String) {
         endCursor
       }
     }
+  }
+}
+"""
+
+_GRAPHQL_ENTERPRISE_ACCESS_QUERY = """
+query($slug: String!) {
+  enterprise(slug: $slug) {
+    slug
   }
 }
 """
@@ -102,6 +110,10 @@ async def poll_device_token(settings: Settings, device_code: str) -> dict[str, A
     if "access_token" not in payload:
         raise GitHubAuthError("GitHub token response missing access_token")
 
+    logger.info(
+        "GitHub device token response scopes: %s",
+        payload.get("scope", "<none>"),
+    )
     return payload
 
 
@@ -125,6 +137,12 @@ async def get_authenticated_user(
             response.text,
         )
         raise GitHubAuthError(f"Failed to fetch GitHub user: {exc}") from exc
+
+    logger.info(
+        "GitHub /user token scopes: %s; accepted permissions: %s",
+        response.headers.get("X-OAuth-Scopes"),
+        response.headers.get("X-Accepted-GitHub-Permissions"),
+    )
     return response.json()
 
 
@@ -217,10 +235,68 @@ async def get_user_enterprise_slugs(
     return slugs
 
 
+async def has_enterprise_access(
+    http_client: httpx.AsyncClient, token: str, enterprise_slug: str
+) -> bool:
+    """Fallback check: query the enterprise directly by slug.
+
+    A non-null response means the token can access the enterprise, which for
+    an enterprise's members indicates membership.
+    """
+    response = await http_client.post(
+        "https://api.github.com/graphql",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "query": _GRAPHQL_ENTERPRISE_ACCESS_QUERY,
+            "variables": {"slug": enterprise_slug},
+        },
+    )
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        logger.warning(
+            "GitHub enterprise access query HTTP %s: %s",
+            response.status_code,
+            response.text,
+        )
+        raise GitHubAuthError(f"GitHub enterprise access query failed: {exc}") from exc
+
+    data = response.json()
+    if "errors" in data:
+        messages = "; ".join(str(e.get("message", e)) for e in data["errors"])
+        logger.warning(
+            "GitHub enterprise access query errors: %s; response: %s",
+            messages,
+            response.text,
+        )
+        raise GitHubAuthError(f"GitHub GraphQL errors: {messages}")
+
+    enterprise = data.get("data", {}).get("enterprise")
+    if enterprise is not None:
+        logger.info("GitHub enterprise access query succeeded for %s", enterprise_slug)
+        return True
+
+    logger.info(
+        "GitHub enterprise access query returned null for %s; user is not a member",
+        enterprise_slug,
+    )
+    return False
+
+
 async def is_member_of_enterprise(
     http_client: httpx.AsyncClient, token: str, enterprise_slug: str
 ) -> bool:
     """Check whether the token's user is a member of the configured enterprise."""
-    slugs = await get_user_enterprise_slugs(http_client, token)
     target = enterprise_slug.lower()
-    return any(slug.lower() == target for slug in slugs)
+
+    try:
+        slugs = await get_user_enterprise_slugs(http_client, token)
+        if any(slug.lower() == target for slug in slugs):
+            return True
+    except GitHubAuthError as exc:
+        logger.warning("Primary enterprise membership check failed: %s", exc)
+
+    return await has_enterprise_access(http_client, token, enterprise_slug)
