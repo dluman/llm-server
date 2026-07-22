@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 import httpx
+import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -29,11 +30,12 @@ async def lifespan(app: FastAPI):
     app.state.http_client = httpx.AsyncClient(
         timeout=settings.upstream_timeout_seconds,
         follow_redirects=True,
-        http2=False,
     )
+    app.state.requests_session = requests.Session()
     yield
     logger.info("Shutting down")
     await app.state.http_client.aclose()
+    app.state.requests_session.close()
 
 
 app = FastAPI(

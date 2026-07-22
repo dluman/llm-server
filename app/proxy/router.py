@@ -1,8 +1,9 @@
+import asyncio
 import json
 import logging
 from typing import Any
 
-import httpx
+import requests
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
@@ -61,11 +62,6 @@ async def proxy_v1(
     }
     forward_headers["Authorization"] = f"Bearer {key}"
 
-    # httpx auto-injects 'python-httpx/0.27.0' as User-Agent, which Zen's bot
-    # filter blocks. Use a benign default when the client did not send one.
-    if not any(k.lower() == "user-agent" for k in forward_headers):
-        forward_headers["User-Agent"] = "curl/7.88.1"
-
     base_url = settings.canonical_zen_base_url.rstrip("/")
     upstream_url = f"{base_url}/v1/{path}"
 
@@ -111,20 +107,26 @@ async def proxy_v1(
         bool(key),
     )
 
-    http_client = request.app.state.http_client
+    session = request.app.state.requests_session
+    loop = asyncio.get_event_loop()
     try:
-        upstream_response = await http_client.request(
-            method=method,
-            url=upstream_url,
-            params=query_params,
-            headers=forward_headers,
-            content=body,
-            follow_redirects=True,
+        upstream_response = await loop.run_in_executor(
+            None,
+            lambda: session.request(
+                method=method,
+                url=upstream_url,
+                params=query_params,
+                headers=forward_headers,
+                data=body,
+                stream=True,
+                timeout=settings.upstream_timeout_seconds,
+                allow_redirects=True,
+            ),
         )
-    except httpx.TimeoutException as exc:
+    except requests.Timeout as exc:
         logger.warning("Upstream timeout: %s %s", method, upstream_url)
         raise HTTPException(status_code=504, detail="Gateway timeout") from exc
-    except httpx.RequestError as exc:
+    except requests.RequestException as exc:
         logger.warning("Upstream request error: %s", exc)
         raise HTTPException(status_code=502, detail="Bad gateway") from exc
     except Exception as exc:
@@ -140,29 +142,26 @@ async def proxy_v1(
 
     if upstream_response.status_code >= 300:
         logger.warning(
-            "Upstream non-2xx: status=%s http_version=%s headers=%s",
+            "Upstream non-2xx: status=%s headers=%s",
             upstream_response.status_code,
-            getattr(upstream_response, "http_version", "unknown"),
             dict(upstream_response.headers),
         )
 
-    async def response_stream():
-        try:
-            async for chunk in upstream_response.aiter_bytes():
-                yield chunk
-        finally:
-            await upstream_response.aclose()
+    # Pre-read response body in thread pool to avoid blocking the event loop
+    # during streaming. For large responses this uses more memory but keeps
+    # the async path simple and testable.
+    content = await loop.run_in_executor(None, lambda: upstream_response.content)
+    upstream_response.close()
 
     logger.info(
-        "Proxy response: method=%s path=%s upstream=%s upstream_status=%s http_version=%s",
+        "Proxy response: method=%s path=%s upstream=%s upstream_status=%s",
         request.method,
         path,
         upstream_url,
         upstream_response.status_code,
-        getattr(upstream_response, "http_version", "unknown"),
     )
     return StreamingResponse(
-        content=response_stream(),
+        content=iter([content]),
         status_code=upstream_response.status_code,
         headers=response_headers,
     )
