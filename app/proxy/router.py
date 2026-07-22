@@ -96,6 +96,12 @@ async def proxy_v1(
                 upstream_url,
             )
 
+    safe_headers = {
+        k: ("<redacted>" if k.lower() == "authorization" else v)
+        for k, v in forward_headers.items()
+    }
+    logger.debug("Proxy upstream headers: %s", safe_headers)
+
     logger.info(
         "Proxy request: method=%s path=%s upstream=%s user=%s key_present=%s",
         request.method,
@@ -132,6 +138,14 @@ async def proxy_v1(
             continue
         response_headers[name] = value
 
+    if upstream_response.status_code >= 300:
+        logger.warning(
+            "Upstream non-2xx: status=%s http_version=%s headers=%s",
+            upstream_response.status_code,
+            getattr(upstream_response, "http_version", "unknown"),
+            dict(upstream_response.headers),
+        )
+
     async def response_stream():
         try:
             async for chunk in upstream_response.aiter_bytes():
@@ -140,11 +154,12 @@ async def proxy_v1(
             await upstream_response.aclose()
 
     logger.info(
-        "Proxy response: method=%s path=%s upstream=%s upstream_status=%s",
+        "Proxy response: method=%s path=%s upstream=%s upstream_status=%s http_version=%s",
         request.method,
         path,
         upstream_url,
         upstream_response.status_code,
+        getattr(upstream_response, "http_version", "unknown"),
     )
     return StreamingResponse(
         content=response_stream(),
