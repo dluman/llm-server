@@ -154,13 +154,29 @@ async def get_user_enterprise_slugs(
             raise GitHubAuthError(f"GitHub GraphQL request failed: {exc}") from exc
 
         data = response.json()
+        if not isinstance(data, dict):
+            logger.warning("GitHub GraphQL returned non-JSON/dict response: %s", response.text)
+            raise GitHubAuthError("GitHub GraphQL returned an unexpected response")
+
         if "errors" in data:
             messages = "; ".join(
                 str(e.get("message", e)) for e in data["errors"]
             )
+            logger.warning("GitHub GraphQL errors: %s; response: %s", messages, response.text)
             raise GitHubAuthError(f"GitHub GraphQL errors: {messages}")
 
-        enterprises = data["data"]["viewer"]["enterprises"]
+        viewer_data = data.get("data")
+        if viewer_data is None:
+            logger.warning("GitHub GraphQL returned null data: %s", response.text)
+            raise GitHubAuthError(
+                "GitHub GraphQL returned no data; the token may lack the required enterprise permission"
+            )
+        enterprises = viewer_data.get("viewer", {}).get("enterprises")
+        if enterprises is None:
+            logger.warning("GitHub GraphQL missing enterprises field: %s", response.text)
+            raise GitHubAuthError(
+                "GitHub GraphQL response missing enterprise information"
+            )
         slugs.extend(node["slug"] for node in enterprises["nodes"])
 
         page_info = enterprises["pageInfo"]
