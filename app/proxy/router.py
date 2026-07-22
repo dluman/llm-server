@@ -62,7 +62,7 @@ async def proxy_v1(
     forward_headers["Authorization"] = f"Bearer {key}"
     # Use a consistent benign User-Agent so Cloudflare BIC sees a matching
     # User-Agent + TLS fingerprint pair (httpx upstream client).
-    forward_headers["User-Agent"] = "opencode-api-proxy/1.0"
+    #forward_headers["User-Agent"] = "opencode-api-proxy/1.0"
 
     base_url = settings.canonical_zen_base_url.rstrip("/")
     upstream_url = f"{base_url}/v1/{path}"
