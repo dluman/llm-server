@@ -27,7 +27,7 @@ services:
         value: X-Zen-Api-Key
       - key: ZEN_WORKER_URL
         scope: RUN_TIME
-        value: https://llm-chompers.dluman.workers.dev
+        value: ""
       - key: ZEN_WORKER_TOKEN
         scope: RUN_TIME
         type: SECRET
