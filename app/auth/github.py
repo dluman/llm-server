@@ -44,6 +44,11 @@ async def request_device_code(settings: Settings) -> dict[str, Any]:
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
+        logger.warning(
+            "GitHub device code request HTTP %s: %s",
+            response.status_code,
+            response.text,
+        )
         raise GitHubAuthError(f"GitHub device code request failed: {exc}") from exc
 
     payload = response.json()
@@ -74,6 +79,10 @@ async def poll_device_token(settings: Settings, device_code: str) -> dict[str, A
     # GitHub returns 200 even for pending/errors in the OAuth flow.
     payload = response.json()
     if "error" in payload:
+        logger.warning(
+            "GitHub device token poll error response: %s",
+            response.text,
+        )
         error = payload["error"]
         if error == "authorization_pending":
             raise GitHubPendingError("Authorization pending")
@@ -105,6 +114,11 @@ async def get_authenticated_user(
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
+        logger.warning(
+            "GitHub /user request HTTP %s: %s",
+            response.status_code,
+            response.text,
+        )
         raise GitHubAuthError(f"Failed to fetch GitHub user: {exc}") from exc
     return response.json()
 
@@ -132,6 +146,11 @@ async def get_user_enterprise_slugs(
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
+            logger.warning(
+                "GitHub GraphQL request HTTP %s: %s",
+                response.status_code,
+                response.text,
+            )
             raise GitHubAuthError(f"GitHub GraphQL request failed: {exc}") from exc
 
         data = response.json()
