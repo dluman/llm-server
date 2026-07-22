@@ -176,18 +176,43 @@ async def get_user_enterprise_slugs(
             raise GitHubAuthError(
                 "GitHub GraphQL returned no data; the token may lack the required enterprise permission"
             )
-        enterprises = viewer_data.get("viewer", {}).get("enterprises")
-        if enterprises is None:
-            logger.warning("GitHub GraphQL missing enterprises field: %s", response.text)
-            raise GitHubAuthError(
-                "GitHub GraphQL response missing enterprise information"
-            )
-        slugs.extend(node["slug"] for node in enterprises["nodes"])
 
-        page_info = enterprises["pageInfo"]
-        if not page_info["hasNextPage"]:
+        try:
+            enterprises = viewer_data["viewer"]["enterprises"]
+            if enterprises is None:
+                raise KeyError("enterprises")
+            nodes = enterprises["nodes"]
+            page_info = enterprises["pageInfo"]
+        except (KeyError, TypeError) as exc:
+            logger.warning(
+                "GitHub GraphQL response missing expected enterprise fields (%s): %s",
+                exc,
+                response.text,
+            )
+            raise GitHubAuthError(
+                "GitHub GraphQL response missing enterprise information; "
+                "the token may lack the required enterprise permission"
+            ) from exc
+
+        if not isinstance(nodes, list):
+            logger.warning(
+                "GitHub GraphQL enterprises.nodes is not a list: %s", response.text
+            )
+            raise GitHubAuthError(
+                "GitHub GraphQL returned unexpected enterprise node data"
+            )
+
+        for node in nodes:
+            if isinstance(node, dict) and "slug" in node:
+                slugs.append(node["slug"])
+            else:
+                logger.warning(
+                    "GitHub GraphQL enterprise node is malformed: %s", response.text
+                )
+
+        if not page_info.get("hasNextPage"):
             break
-        after = page_info["endCursor"]
+        after = page_info.get("endCursor")
 
     return slugs
 

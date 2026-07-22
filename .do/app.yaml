@@ -49,6 +49,9 @@ services:
       - key: GITHUB_SESSION_TTL_SECONDS
         scope: RUN_TIME
         value: "28800"
+      - key: GITHUB_DEVICE_FLOW_SCOPES
+        scope: RUN_TIME
+        value: "read:org read:enterprise"
 domains:
   - domain: llm.chompe.rs
     type: PRIMARY
