@@ -88,7 +88,7 @@ def test_proxy_v1_routes_to_chat_completions():
     assert fake_client.last_call is not None
     assert fake_client.last_call["url"] == "https://opencode.ai/zen/v1/chat/completions"
     assert fake_client.last_call["method"] == "POST"
-    assert fake_client.last_call["headers"]["X-Zen-Api-Key"] == "test-key"
+    assert fake_client.last_call["headers"]["Authorization"] == "Bearer test-key"
 
 
 def test_proxy_v1_gemini_routes_to_models():

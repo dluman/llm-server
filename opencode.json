@@ -6,11 +6,6 @@
       "command": ["npx", "-y", "mcp-remote", "https://mcp.cloudflare.com/mcp"],
       "enabled": true
     },
-    "cloudflare-observability": {
-      "type": "local",
-      "command": ["npx", "-y", "mcp-remote", "https://observability.mcp.cloudflare.com/mcp"],
-      "enabled": true
-    },
     "digitalocean-app-platform": {
       "type": "local",
       "command": ["npx", "-y", "@digitalocean/mcp", "--services", "apps"],

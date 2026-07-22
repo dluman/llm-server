@@ -1,7 +1,0 @@
-name = "llm-chompers"
-main = "src/index.js"
-compatibility_date = "2026-07-22"
-
-[observability.logs]
-enabled = true
-invocation_logs = true

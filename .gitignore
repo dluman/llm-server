@@ -6,8 +6,3 @@ __pycache__/
 *.egg-info/
 .DS_Store
 
-# Cloudflare Worker
-worker/.wrangler/
-worker/node_modules/
-worker/.dev.vars
-

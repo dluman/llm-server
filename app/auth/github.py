@@ -119,8 +119,25 @@ async def poll_device_token(settings: Settings, device_code: str) -> dict[str, A
             },
         )
 
-    # GitHub returns 200 even for pending/errors in the OAuth flow.
-    payload = response.json()
+    if response.status_code >= 400:
+        logger.warning(
+            "GitHub device token poll HTTP %s: %s",
+            response.status_code,
+            response.text[:500],
+        )
+        raise GitHubAuthError(
+            f"GitHub OAuth service returned HTTP {response.status_code}"
+        )
+
+    try:
+        payload = response.json()
+    except (json.JSONDecodeError, ValueError):
+        logger.warning(
+            "GitHub device token poll returned non-JSON body (HTTP %s): %s",
+            response.status_code,
+            response.text[:500],
+        )
+        raise GitHubAuthError("GitHub OAuth service returned an invalid response")
 
     logger.info(
         "GitHub device token poll response HTTP %s: %s",

@@ -25,13 +25,6 @@ services:
       - key: ZEN_API_HEADER
         scope: RUN_TIME
         value: X-Zen-Api-Key
-      - key: ZEN_WORKER_URL
-        scope: RUN_TIME
-        value: ""
-      - key: ZEN_WORKER_TOKEN
-        scope: RUN_TIME
-        type: SECRET
-        value: SET_IN_CONSOLE
       - key: AUTH_CACHE_TTL_SECONDS
         scope: RUN_TIME
         value: "300"
