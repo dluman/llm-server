@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.config import get_settings
-from app.dependencies import require_valid_key
+from app.dependencies import require_github_session, require_valid_key
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ _NO_BODY_METHODS = {"GET", "HEAD", "DELETE", "OPTIONS"}
 async def proxy_v1(
     request: Request,
     path: str,
+    github_login: str = Depends(require_github_session),
     key: str = Depends(require_valid_key),
 ):
     """Transparently proxy authenticated requests to the Opencode Zen upstream."""

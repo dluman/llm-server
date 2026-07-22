@@ -1,15 +1,18 @@
-name: opencode-api
+name: llm-server
+region: nyc
 services:
-  - name: api
+  - name: llm-server
     source_dir: /
     github:
+      repo: dluman/llm-server
       branch: main
       deploy_on_push: true
     build_command: pip install -r requirements.txt
     run_command: uvicorn app.main:app --host 0.0.0.0 --port 8080
     environment_slug: python
     instance_count: 1
-    instance_size_slug: basic-xxs
+    instance_size_slug: apps-s-1vcpu-1gb
+    http_port: 8080
     health_check:
       http_path: /health
     envs:
@@ -34,3 +37,20 @@ services:
       - key: LOG_LEVEL
         scope: RUN_TIME
         value: info
+      - key: GITHUB_AUTH_ENABLED
+        scope: RUN_TIME
+        value: "true"
+      - key: GITHUB_DEVICE_FLOW_ENABLED
+        scope: RUN_TIME
+        value: "true"
+      - key: GITHUB_DIRECT_TOKEN_ENABLED
+        scope: RUN_TIME
+        value: "true"
+      - key: GITHUB_SESSION_TTL_SECONDS
+        scope: RUN_TIME
+        value: "28800"
+domains:
+  - domain: llm.chompe.rs
+    type: PRIMARY
+features:
+  - buildpack-stack=ubuntu-22

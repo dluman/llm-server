@@ -5,6 +5,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth.router import router as auth_router
 from app.config import get_settings
 from app.health import router as health_router
 from app.proxy.router import router as proxy_router
@@ -49,4 +50,5 @@ if settings.cors_origins_list:
     )
 
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(proxy_router)

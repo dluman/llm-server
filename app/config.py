@@ -1,7 +1,7 @@
 from functools import lru_cache
 from urllib.parse import urlparse
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -21,7 +21,39 @@ class Settings(BaseSettings):
 
     cors_origins: str = ""
 
+    # GitHub Enterprise auth
+    github_auth_enabled: bool = True
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    github_enterprise_slug: str = ""
+    github_session_ttl_seconds: int = 28800
+    github_device_flow_enabled: bool = True
+    github_direct_token_enabled: bool = True
+    session_secret_key: str = ""
+
+    github_graphql_url: str = "https://api.github.com/graphql"
+    github_access_token_url: str = "https://github.com/login/oauth/access_token"
+    github_device_code_url: str = "https://github.com/login/device/code"
+
+    @field_validator("session_secret_key")
+    @classmethod
+    def _validate_session_secret_key(cls, v: str, info) -> str:
+        if info.data.get("github_auth_enabled") and v and len(v) < 32:
+            raise ValueError(
+                "SESSION_SECRET_KEY must be at least 32 bytes when GitHub auth is enabled"
+            )
+        return v
+
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    @property
+    def github_auth_configured(self) -> bool:
+        return bool(
+            self.github_client_id
+            and self.github_client_secret
+            and self.github_enterprise_slug
+            and self.session_secret_key
+        )
 
     @property
     def canonical_zen_base_url(self) -> str:
