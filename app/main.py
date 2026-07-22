@@ -2,7 +2,6 @@ import logging
 from contextlib import asynccontextmanager
 
 import httpx
-from curl_cffi import requests as curl_requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -31,17 +30,9 @@ async def lifespan(app: FastAPI):
         timeout=settings.upstream_timeout_seconds,
         follow_redirects=True,
     )
-    # Browser-impersonating client used for upstream Zen requests. Cloudflare's
-    # Browser Integrity Check rejects plain httpx/python requests to the paid
-    # inference endpoints, so we use curl_cffi to look like a real browser.
-    app.state.curl_client = curl_requests.AsyncSession(
-        impersonate="chrome120",
-        timeout=settings.upstream_timeout_seconds,
-    )
     yield
     logger.info("Shutting down")
     await app.state.http_client.aclose()
-    await app.state.curl_client.close()
 
 
 app = FastAPI(

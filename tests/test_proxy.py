@@ -6,25 +6,25 @@ from app.main import app
 from app.proxy.routing import resolve_zen_endpoint
 
 
-class _FakeCurlResponse:
+class _FakeHttpResponse:
     status_code = 200
     headers = {"content-type": "application/json"}
 
-    async def aiter_content(self, chunk_size=8192):
+    async def aiter_bytes(self, chunk_size=8192):
         yield b'{"ok": true}'
 
     async def aclose(self):
         pass
 
 
-class _FakeCurlClient:
+class _FakeHttpClient:
     last_call: dict | None = None
 
     async def request(self, **kwargs):
         self.last_call = kwargs
-        return _FakeCurlResponse()
+        return _FakeHttpResponse()
 
-    async def close(self):
+    async def aclose(self):
         pass
 
 
@@ -68,13 +68,13 @@ def test_resolve_zen_endpoint(model_id, expected_endpoint):
 
 
 def test_proxy_v1_routes_to_chat_completions():
-    fake_client = _FakeCurlClient()
+    fake_client = _FakeHttpClient()
     app.dependency_overrides[require_github_session] = _fake_session
     app.dependency_overrides[require_valid_key] = _fake_key
 
     try:
         with TestClient(app) as client:
-            client.app.state.curl_client = fake_client
+            client.app.state.http_client = fake_client
             response = client.post(
                 "/v1/chat/completions",
                 json={"model": "deepseek-v4-flash", "messages": [{"role": "user", "content": "hi"}]},
@@ -92,13 +92,13 @@ def test_proxy_v1_routes_to_chat_completions():
 
 
 def test_proxy_v1_gemini_routes_to_models():
-    fake_client = _FakeCurlClient()
+    fake_client = _FakeHttpClient()
     app.dependency_overrides[require_github_session] = _fake_session
     app.dependency_overrides[require_valid_key] = _fake_key
 
     try:
         with TestClient(app) as client:
-            client.app.state.curl_client = fake_client
+            client.app.state.http_client = fake_client
             response = client.post(
                 "/v1/chat/completions",
                 json={"model": "gemini-3.6-flash", "messages": [{"role": "user", "content": "hi"}]},

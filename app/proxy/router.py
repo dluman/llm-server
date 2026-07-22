@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Any
 
-from curl_cffi.requests import errors as curl_errors
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
@@ -26,15 +26,6 @@ _HOP_BY_HOP_HEADERS = {
     "content-length",
 }
 
-# Headers curl_cffi manages as part of browser impersonation. Forwarding a
-# non-browser User-Agent or Accept-* value from the client can break BIC bypass.
-_CURL_MANAGED_HEADERS = {
-    "user-agent",
-    "accept",
-    "accept-encoding",
-    "accept-language",
-}
-
 # Methods that typically have no body.
 _NO_BODY_METHODS = {"GET", "HEAD", "DELETE", "OPTIONS"}
 
@@ -56,7 +47,7 @@ async def proxy_v1(
     forward_headers: dict[str, str] = {}
     for name, value in request.headers.items():
         lower = name.lower()
-        if lower in _HOP_BY_HOP_HEADERS or lower in _CURL_MANAGED_HEADERS:
+        if lower in _HOP_BY_HOP_HEADERS:
             continue
         forward_headers[name] = value
 
@@ -109,20 +100,20 @@ async def proxy_v1(
         bool(key),
     )
 
-    curl_client = request.app.state.curl_client
+    http_client = request.app.state.http_client
     try:
-        upstream_response = await curl_client.request(
+        upstream_response = await http_client.request(
             method=method,
             url=upstream_url,
             params=query_params,
             headers=forward_headers,
-            data=body,
-            stream=True,
+            content=body,
+            follow_redirects=True,
         )
-    except curl_errors.RequestsError as exc:
-        if exc.code == 28:  # CURLE_OPERATION_TIMEDOUT
-            logger.warning("Upstream timeout: %s %s", method, upstream_url)
-            raise HTTPException(status_code=504, detail="Gateway timeout") from exc
+    except httpx.TimeoutException as exc:
+        logger.warning("Upstream timeout: %s %s", method, upstream_url)
+        raise HTTPException(status_code=504, detail="Gateway timeout") from exc
+    except httpx.RequestError as exc:
         logger.warning("Upstream request error: %s", exc)
         raise HTTPException(status_code=502, detail="Bad gateway") from exc
     except Exception as exc:
@@ -132,14 +123,13 @@ async def proxy_v1(
     response_headers: dict[str, str] = {}
     for name, value in upstream_response.headers.items():
         lower = name.lower()
-        # curl_cffi decompresses encoded responses; don't forward the encoding.
         if lower in _HOP_BY_HOP_HEADERS or lower == "content-encoding":
             continue
         response_headers[name] = value
 
     async def response_stream():
         try:
-            async for chunk in upstream_response.aiter_content():
+            async for chunk in upstream_response.aiter_bytes():
                 yield chunk
         finally:
             await upstream_response.aclose()

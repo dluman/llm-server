@@ -5,7 +5,6 @@ pydantic>=2.7.0
 pydantic-settings>=2.3.0
 cachetools>=5.3.0
 pyjwt>=2.8.0
-curl_cffi>=0.15.0
 
 # Development / testing
 pytest>=8.2.0
