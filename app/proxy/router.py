@@ -159,12 +159,11 @@ async def proxy_v1(
             await upstream_response.aclose()
 
     logger.info(
-        "Proxy response: method=%s path=%s upstream=%s upstream_status=%s http_version=%s body=%s",
+        "Proxy response: method=%s path=%s upstream=%s upstream_status=%s http_version=%s",
         request.method,
         path,
         upstream_url,
         upstream_response.status_code,
-        body,
         getattr(upstream_response, "http_version", "unknown"),
     )
     return StreamingResponse(
